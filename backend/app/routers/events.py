@@ -10,6 +10,7 @@ POST /api/ingest/trigger — manual ingest (dev/admin)
 """
 import json
 import logging
+import time
 from typing import Optional
 
 from fastapi import APIRouter, Query, HTTPException, Request
@@ -21,6 +22,8 @@ from app.services import ingestion
 
 router = APIRouter(prefix="/api")
 logger = logging.getLogger(__name__)
+
+_geojson_cache = {}
 
 
 @router.get("/events")
@@ -81,6 +84,11 @@ async def events_geojson(
     days: Optional[int] = Query(None, ge=1, le=3650),
 ):
     """GeoJSON FeatureCollection — direct source for MapLibre."""
+    cache_key = (category, status, limit, days)
+    cached = _geojson_cache.get(cache_key)
+    if cached and time.time() < cached["expires"]:
+        return cached["data"]
+
     where = []
     args = []
     i = 1
@@ -136,7 +144,9 @@ async def events_geojson(
             },
         })
 
-    return {"type": "FeatureCollection", "features": features}
+    result = {"type": "FeatureCollection", "features": features}
+    _geojson_cache[cache_key] = {"data": result, "expires": time.time() + 30}
+    return result
 
 
 @router.get("/events/{eonet_id}")

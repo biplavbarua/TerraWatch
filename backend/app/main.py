@@ -3,6 +3,7 @@ TerraWatch FastAPI application entrypoint.
 """
 import logging
 from contextlib import asynccontextmanager
+import sentry_sdk
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,6 +19,16 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 logger = logging.getLogger("terrawatch")
+
+if settings.SENTRY_DSN:
+    logger.info("Initializing Sentry error tracking...")
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        traces_sample_rate=0.1,  # Adjust based on traffic to save quota
+        _experiments={
+            "continuous_profiling_auto_start": True,
+        },
+    )
 
 
 @asynccontextmanager

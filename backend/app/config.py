@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     # Set to any long random string in production.
     ADMIN_TOKEN: str = "change-me-in-production"
 
+    # Sentry error tracking
+    SENTRY_DSN: str = ""
+
     @property
     def cors_origins_list(self) -> list[str]:
         if self.CORS_ORIGINS == "*":

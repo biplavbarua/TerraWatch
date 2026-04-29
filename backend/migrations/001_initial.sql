@@ -1,6 +1,6 @@
 -- TerraWatch — Initial Schema
--- Requires PostGIS extension. Enable it in Supabase/Neon dashboard first:
--- CREATE EXTENSION IF NOT EXISTS postgis;
+-- PostGIS extension is created automatically below (idempotent — safe to re-run)
+CREATE EXTENSION IF NOT EXISTS postgis;
 
 -- ─── Events ────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS events (

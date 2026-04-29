@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     # Sentry error tracking
     SENTRY_DSN: str = ""
 
+    # Upstash Redis for Rate Limiting
+    UPSTASH_REDIS_URL: str = ""
+
     @property
     def cors_origins_list(self) -> list[str]:
         if self.CORS_ORIGINS == "*":

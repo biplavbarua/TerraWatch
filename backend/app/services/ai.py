@@ -138,7 +138,10 @@ async def _tool_query_events(
         args.append(category)
         i += 1
     if days:
-        where_clauses.append(f"g.recorded_at > NOW() - INTERVAL '{days} days'")
+        # Parameterise interval — validate days is an int from the schema
+        where_clauses.append(f"g.recorded_at > NOW() - (${i} * INTERVAL '1 day')")
+        args.append(days)
+        i += 1
 
     where_sql = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
 
@@ -164,22 +167,38 @@ async def _tool_query_events(
 
 
 async def _tool_get_stats(status: str = "all", days: Optional[int] = None) -> list[dict]:
+    """
+    Count events grouped by category.
+    When `days` is set, filter by the *latest geometry timestamp* (last observed
+    position) rather than event creation time, so results reflect real activity.
+    """
     where_parts = []
     args: list[Any] = []
     i = 1
 
     if status != "all":
-        where_parts.append(f"status = ${i}")
+        where_parts.append(f"e.status = ${i}")
         args.append(status)
         i += 1
     if days:
-        where_parts.append(f"recorded_at > NOW() - INTERVAL '{days} days'")
+        # Parameterise the interval — no f-string injection
+        where_parts.append(f"last_geom.recorded_at > NOW() - (${i} * INTERVAL '1 day')")
+        args.append(days)
+        i += 1
 
     where_sql = "WHERE " + " AND ".join(where_parts) if where_parts else ""
+
+    # Join to latest geometry per event so `days` reflects last *observed* activity
     query = f"""
-        SELECT category, COUNT(*) AS count
-        FROM events {where_sql}
-        GROUP BY category ORDER BY count DESC
+        SELECT e.category, COUNT(*) AS count
+        FROM events e
+        LEFT JOIN LATERAL (
+            SELECT recorded_at FROM event_geometries
+            WHERE event_id = e.id
+            ORDER BY recorded_at DESC LIMIT 1
+        ) last_geom ON TRUE
+        {where_sql}
+        GROUP BY e.category ORDER BY count DESC
     """
     rows = await db.fetch_all(query, *args)
     return [dict(r) for r in rows]

@@ -1,12 +1,8 @@
-# 🌍 TerraWatch
+# 🌍 TerraWatch — Earth Event Intelligence Platform
 
-> **Real-time Earth event intelligence** — a full-stack platform that visualizes NASA's natural disaster data on a 3D interactive globe, enriched with AI-powered Q&A and historical trajectory tracking.
+> Real-time natural disaster intelligence powered by NASA EONET, PostGIS, and AI — visualized on an interactive world map.
 
-[![Python](https://img.shields.io/badge/Python-3.9+-3776AB?logo=python&logoColor=white)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![MapLibre GL JS](https://img.shields.io/badge/MapLibre_GL_JS-3.6-396CB2?logo=maplibre&logoColor=white)](https://maplibre.org)
-[![Supabase](https://img.shields.io/badge/Supabase-PostGIS-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com)
-[![OpenRouter](https://img.shields.io/badge/AI-OpenRouter%20%2F%20Gemini-FF6B35)](https://openrouter.ai)
+![TerraWatch Dashboard](https://img.shields.io/badge/status-active-brightgreen) ![MapLibre GL JS](https://img.shields.io/badge/MapLibre-v5.24-blue) ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-green) ![Python](https://img.shields.io/badge/Python-3.11%2B-blue) ![Supabase](https://img.shields.io/badge/Supabase-PostGIS-orange)
 
 ---
 
@@ -14,42 +10,41 @@
 
 | Feature | Description |
 |---|---|
-| 🌐 **3D Globe Visualization** | Live disaster events rendered as color-coded markers on a WebGL globe powered by MapLibre GL JS |
-| 🔥 **Real-time EONET Data** | Auto-ingests NASA EONET events every 15 minutes (wildfires, volcanoes, storms, floods, and more) |
-| 🤖 **AI Q&A Engine** | Natural language queries answered by Gemini 2.0 Flash via OpenRouter, with database tool-calling |
-| 🗺️ **Trajectory Tracking** | Multi-point event paths (e.g. typhoon tracks) visualized as animated routes on the globe |
-| 🔍 **Filter & Search** | Filter by category (wildfires, storms, volcanoes…) + full-text search across all events |
-| 📊 **Historical Backfill** | Ingests 3 years of historical closed events on startup for trend analysis |
-| 🔗 **Source Links** | Direct links to primary sources (IRWIN, JTWC, USGS reports) in each event popup |
-| 💾 **PostGIS Spatial DB** | All geometries stored as native PostGIS points for efficient spatial queries |
+| 🗺 **Interactive Map** | MapLibre GL JS v5 — clustered event markers, pulsing animations, click-to-zoom |
+| 📡 **Live NASA Data** | Polls [NASA EONET API](https://eonet.gsfc.nasa.gov/) every 15 minutes for open natural events |
+| 🧠 **AI Q&A** | Ask natural-language questions about active events via OpenRouter / Gemini |
+| 🔥 **Event Categories** | Wildfires, Volcanoes, Earthquakes, Severe Storms, Floods, Sea Ice, and more |
+| 📍 **Track Paths** | View historical movement paths for iceberg and storm events |
+| 🔍 **Search & Filter** | Filter by category, status, and date range |
+| 📊 **Live Stats Bar** | Per-category event counts updated in real time |
+| 🔒 **Hardened Backend** | Parameterized SQL, rate-limited AI endpoint, input validation |
 
 ---
 
-## 🏗️ Architecture
+## 🏗 Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                     Browser (Chrome)                     │
-│  MapLibre GL JS 3D Globe  ·  Vanilla JS  ·  AI Chat UI  │
-└──────────────────────┬──────────────────────────────────┘
-                       │ REST API (localhost:8000)
-┌──────────────────────▼──────────────────────────────────┐
-│                    FastAPI Backend                        │
-│   /api/events/geojson  ·  /api/stats  ·  /api/ask        │
-│   APScheduler (15-min poll)  ·  Backfill worker           │
-└──────────────────────┬──────────────────────────────────┘
-          ┌────────────┴────────────────┐
-          │                             │
-┌─────────▼──────────┐    ┌────────────▼───────────┐
-│  Supabase Postgres  │    │  OpenRouter / Gemini    │
-│  + PostGIS 3.3      │    │  (Tool-calling LLM)     │
-│  1000+ events       │    │  Model: gemini-2.0-flash│
-└────────────────────┘    └────────────────────────┘
-          │
-┌─────────▼──────────┐
-│  NASA EONET API v3  │
-│  Real-time events   │
-└────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                        TerraWatch Stack                         │
+├──────────────────┬──────────────────────┬───────────────────────┤
+│   Frontend       │      Backend          │      Database          │
+│   ─────────      │      ───────          │      ────────          │
+│   HTML + CSS     │   FastAPI (Python)    │   Supabase (Postgres)  │
+│   Vanilla JS     │   APScheduler         │   PostGIS extension    │
+│   MapLibre v5    │   asyncpg             │   EONET event cache    │
+│   ES Modules     │   OpenRouter / Gemini │   Geometry tracking    │
+└──────────────────┴──────────────────────┴───────────────────────┘
+```
+
+**Data Flow:**
+```
+NASA EONET API → APScheduler (15 min) → FastAPI Ingestion → Supabase/PostGIS
+                                                                    ↓
+Browser ←── GeoJSON API ←── FastAPI Routers ←── PostGIS Queries ──┘
+   ↓
+MapLibre GL JS → Clustered Event Layers → Popup Cards
+   ↓
+AI Chat Panel → /api/ask → OpenRouter (Gemini) → Formatted Response
 ```
 
 ---
@@ -57,192 +52,192 @@
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Python 3.9+
-- Node.js (for `serve` static files)
-- Supabase project with PostGIS enabled
-- OpenRouter API key
+- Python 3.11+
+- A [Supabase](https://supabase.com) project with PostGIS enabled
+- An [OpenRouter](https://openrouter.ai) API key (for AI chat)
 
-### 1. Clone & Setup Backend
-
+### 1. Clone the repo
 ```bash
-git clone https://github.com/YOUR_USERNAME/TerraWatch.git
-cd TerraWatch/backend
-
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+git clone https://github.com/biplavbarua/TerraWatch.git
+cd TerraWatch
 ```
 
-### 2. Configure Environment
+### 2. Backend setup
+```bash
+cd backend
 
-Create `backend/.env`:
+# Install dependencies
+pip install -r requirements.txt
 
+# Configure environment
+cp .env.example .env
+# Edit .env with your Supabase DATABASE_URL and GEMINI_API_KEY
+```
+
+**.env format:**
 ```env
-DATABASE_URL=postgresql://postgres.YOUR_PROJECT_REF:YOUR_PASSWORD@aws-1-ap-south-1.pooler.supabase.com:5432/postgres
-GEMINI_API_KEY=sk-or-v1-YOUR_OPENROUTER_KEY
+DATABASE_URL=postgresql://user:password@host:5432/postgres
+GEMINI_API_KEY=sk-or-v1-your-openrouter-key
 CORS_ORIGINS=*
 POLL_INTERVAL_MINUTES=15
 BACKFILL_YEARS=3
-SKIP_BACKFILL=false
 ```
 
-> **Note:** The `GEMINI_API_KEY` variable is used for OpenRouter (OpenAI-compatible API). Get a key at [openrouter.ai](https://openrouter.ai).
-
-### 3. Enable PostGIS (Supabase SQL Editor)
-
-```sql
-CREATE EXTENSION IF NOT EXISTS postgis;
-```
-
-### 4. Run the Backend
-
+### 3. Start the backend
 ```bash
 cd backend
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 The backend will:
-1. ✅ Create DB schema automatically
-2. ✅ Ingest current open events from NASA EONET
-3. ✅ Backfill 3 years of historical data
-4. ✅ Start a 15-minute polling scheduler
+- Create database schema on first run
+- Backfill 3 years of historical EONET data
+- Begin polling NASA EONET every 15 minutes
 
-### 5. Serve the Frontend
-
+### 4. Start the frontend
 ```bash
-# Option A: npx serve (recommended)
-cd frontend
-npx serve . -l 3000
-
-# Option B: Python (simplest)
 cd frontend
 python3 -m http.server 3000
+# or with no-cache headers (recommended for development):
+python3 -c "
+import http.server, os
+class NC(http.server.SimpleHTTPRequestHandler):
+    def end_headers(self):
+        self.send_header('Cache-Control','no-store')
+        super().end_headers()
+os.chdir('frontend')
+http.server.HTTPServer(('',3000),NC).serve_forever()
+"
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in **Chrome or Firefox** (WebGL required for 3D globe).
+Open **http://localhost:3000** in your browser.
 
 ---
 
 ## 📡 API Reference
 
-| Endpoint | Method | Description |
+| Method | Endpoint | Description |
 |---|---|---|
-| `/health` | GET | Service health check |
-| `/api/events` | GET | List events (JSON) with filters |
-| `/api/events/geojson` | GET | GeoJSON FeatureCollection for MapLibre |
-| `/api/events/{id}` | GET | Single event detail |
-| `/api/events/{id}/path` | GET | Full trajectory as GeoJSON LineString |
-| `/api/stats` | GET | Event counts by category |
-| `/api/ask` | POST | AI natural language Q&A |
-| `/api/ingest/trigger` | POST | Manually trigger ingestion |
+| `GET` | `/health` | Service health check |
+| `GET` | `/api/events` | Paginated event list (filters: status, category, days, limit) |
+| `GET` | `/api/events/geojson` | GeoJSON FeatureCollection for map rendering |
+| `GET` | `/api/events/{eonet_id}/path` | Event track path as GeoJSON LineString |
+| `GET` | `/api/stats` | Per-category event counts |
+| `POST` | `/api/ask` | AI Q&A (body: `{"question": "..."}`) |
 
-**Query Parameters (events endpoints):**
+### Query Parameters (events)
+| Param | Type | Default | Description |
+|---|---|---|---|
+| `status` | `open` \| `closed` | `open` | Event status filter |
+| `category` | string | all | EONET category slug |
+| `days` | int 1–3650 | all time | Events updated within N days |
+| `limit` | int 1–2000 | 1000 | Max features returned |
 
-| Param | Type | Description |
-|---|---|---|
-| `status` | `open\|closed\|all` | Filter by event status |
-| `category` | string | Filter by category (e.g. `wildfires`) |
-| `limit` | int | Max results (default 500, max 2000) |
-| `days` | int | Only events from last N days |
-| `min_mag` | float | Minimum magnitude filter |
+---
 
-**AI Ask Example:**
-```bash
-curl -X POST http://localhost:8000/api/ask \
-  -H "Content-Type: application/json" \
-  -d '{"question": "How many active wildfires are there in the US right now?"}'
+## 🗄 Database Schema
+
+```sql
+-- Core events table
+CREATE TABLE events (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    eonet_id    TEXT UNIQUE NOT NULL,
+    title       TEXT NOT NULL,
+    category    TEXT NOT NULL,
+    status      TEXT NOT NULL DEFAULT 'open',
+    source_url  TEXT,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Geometry tracking (PostGIS)
+CREATE TABLE event_geometries (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    event_id    UUID REFERENCES events(id) ON DELETE CASCADE,
+    geometry    GEOGRAPHY(POINT, 4326) NOT NULL,
+    recorded_at TIMESTAMPTZ NOT NULL,
+    magnitude_value NUMERIC,
+    magnitude_unit  TEXT
+);
 ```
 
 ---
 
-## 🗂️ Project Structure
+## 🔒 Security
+
+- **SQL Injection**: All queries use parameterized `asyncpg` statements — no string interpolation
+- **Rate Limiting**: AI endpoint throttled to 10 requests/60 seconds per process
+- **Input Validation**: `days`, `limit`, and `status` parameters are validated before query construction
+- **CORS**: Configurable via `CORS_ORIGINS` env var (default `*` for development; restrict for production)
+
+---
+
+## 📁 Project Structure
 
 ```
 TerraWatch/
 ├── backend/
 │   ├── app/
-│   │   ├── main.py              # FastAPI app + lifespan
-│   │   ├── db.py                # asyncpg pool + migrations
-│   │   ├── scheduler.py         # APScheduler (15-min poll)
+│   │   ├── main.py           # FastAPI app + CORS + lifespan
+│   │   ├── config.py         # Pydantic settings
+│   │   ├── db.py             # asyncpg connection pool
+│   │   ├── scheduler.py      # APScheduler EONET polling
 │   │   ├── routers/
-│   │   │   └── events.py        # All API endpoints
+│   │   │   ├── events.py     # /api/events + /api/events/geojson
+│   │   │   ├── ask.py        # /api/ask (AI Q&A with rate limiting)
+│   │   │   └── stats.py      # /api/stats
 │   │   └── services/
-│   │       ├── ai.py            # OpenRouter tool-calling agent
-│   │       ├── eonet.py         # NASA EONET API client
-│   │       └── ingestion.py     # DB upsert logic
-│   ├── migrations/
-│   │   └── 001_initial.sql      # PostGIS schema
-│   ├── requirements.txt
-│   └── .env                     # Local config (gitignored)
-│
+│   │       ├── eonet.py      # NASA EONET API client
+│   │       ├── ingestion.py  # Event upsert + geometry storage
+│   │       └── ai.py         # Gemini/OpenRouter integration
+│   └── requirements.txt
 └── frontend/
-    ├── index.html               # App shell
+    ├── index.html            # App shell + MapLibre CDN
     └── src/
-        ├── main.js              # Bootstrap + MapLibre init
-        ├── api.js               # Fetch wrapper
+        ├── main.js           # App orchestrator + map init
+        ├── api.js            # Backend API client
         ├── layers/
-        │   ├── eventLayer.js    # MapLibre circle layer
-        │   └── pathLayer.js     # Trajectory line layer
+        │   ├── eventLayer.js # MapLibre cluster + circle layers
+        │   └── pathLayer.js  # Event track path rendering
         └── ui/
-            ├── sidebar.js       # Category filters + event list
-            ├── chatPanel.js     # AI chat interface
-            └── eventCard.js     # Event popup/card
+            ├── sidebar.js    # Event list + category filters
+            ├── eventCard.js  # Popup card with AI integration
+            └── chatPanel.js  # AI Q&A slide-in panel
 ```
 
 ---
 
-## 🌐 Event Categories
+## 🗺 Map Features
 
-| Category | Color | Description |
-|---|---|---|
-| 🔥 Wildfires | Orange | Active fire incidents (IRWIN dataset) |
-| 🌀 Severe Storms | Cyan | Typhoons, hurricanes, cyclones |
-| 🌋 Volcanoes | Amber | Volcanic activity worldwide |
-| 🧊 Sea & Lake Ice | Light Blue | Ice formation and breakup events |
-| 🌊 Floods | Blue | River and coastal flooding |
-| 🏔️ Landslides | Purple | Debris flows and landslide events |
-| 🌫️ Dust & Haze | Tan | Dust storms and smoke plumes |
+- **Clustering**: Events cluster at low zoom levels using MapLibre's native clustering engine
+- **Category Colors**: Each event type has a distinct color (🔥 orange for wildfires, 🌋 red for volcanoes, etc.)
+- **Pulse Animation**: Active open events pulse with a glowing ring animation
+- **Track Paths**: For events with multiple geometry records, a "Show Path" button renders the movement trajectory as a dashed line
+- **Fly-to**: Clicking a sidebar event smoothly animates the camera to that event's location
 
 ---
 
-## 🔧 Configuration
+## 🛣 Roadmap
 
-| Variable | Description | Default |
-|---|---|---|
-| `DATABASE_URL` | Supabase PostgreSQL connection URL | required |
-| `GEMINI_API_KEY` | OpenRouter API key | required |
-| `CORS_ORIGINS` | Allowed CORS origins | `*` |
-| `POLL_INTERVAL_MINUTES` | How often to fetch new events | `15` |
-| `BACKFILL_YEARS` | Years of historical data to ingest | `3` |
-| `SKIP_BACKFILL` | Skip historical backfill on startup | `false` |
+- [ ] 3D Globe projection (pending MapLibre v5 globe + Carto tile compatibility)
+- [ ] ML trajectory prediction for iceberg and storm track forecasting
+- [ ] Push notifications for new high-severity events
+- [ ] Export event data as CSV / GeoJSON
+- [ ] Mobile-responsive layout
+- [ ] Dark/light mode toggle
 
 ---
 
-## 🛠️ Tech Stack
+## 🙏 Credits
 
-**Backend**
-- [FastAPI](https://fastapi.tiangolo.com) — async Python web framework
-- [asyncpg](https://magicstack.github.io/asyncpg) — PostgreSQL async driver
-- [APScheduler](https://apscheduler.readthedocs.io) — background task scheduling
-- [httpx](https://www.python-httpx.org) — async HTTP client for EONET API
-- [openai](https://github.com/openai/openai-python) SDK — used with OpenRouter
-
-**Frontend**
-- [MapLibre GL JS 3.6](https://maplibre.org) — open-source WebGL maps + globe projection
-- Vanilla JS ES Modules — zero build step required
-- [Carto Dark Matter](https://carto.com/basemaps) — dark base map tiles
-
-**Infrastructure**
-- [Supabase](https://supabase.com) — managed PostgreSQL + PostGIS
-- [NASA EONET API v3](https://eonet.gsfc.nasa.gov/docs/v3) — natural event source
-- [OpenRouter](https://openrouter.ai) — AI model routing (Gemini 2.0 Flash)
+- **[NASA EONET](https://eonet.gsfc.nasa.gov/)** — Natural event data source
+- **[MapLibre GL JS](https://maplibre.org/)** — Open-source WebGL map rendering
+- **[CARTO](https://carto.com/)** — Dark Matter base map tiles
+- **[Supabase](https://supabase.com/)** — PostgreSQL + PostGIS cloud hosting
+- **[OpenRouter](https://openrouter.ai/)** — LLM API gateway (Gemini 2.0 Flash)
 
 ---
 
 ## 📄 License
 
-MIT — see [LICENSE](LICENSE) for details.
-
----
-
-*Built with 🌍 and real-time Earth data.*
+MIT © 2026 Biplav Barua

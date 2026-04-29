@@ -1,8 +1,7 @@
-/**
- * TerraWatch API client — fetch wrapper for the FastAPI backend.
- */
+// API base URL — override via window.__TERRAWATCH_API__ for deployment.
+// e.g. in index.html: <script>window.__TERRAWATCH_API__ = 'https://api.your-domain.com/api'</script>
+const BASE = window.__TERRAWATCH_API__ ?? 'http://localhost:8000/api';
 
-const BASE = 'http://localhost:8000/api';
 
 async function _json(url, opts = {}) {
   const res = await fetch(url, opts);

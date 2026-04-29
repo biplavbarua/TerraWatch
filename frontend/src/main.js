@@ -16,6 +16,9 @@ const maplibregl = window.maplibregl;
 let map;
 let currentGeoJSON = { type: 'FeatureCollection', features: [] };
 let sidebarVisible = true;
+let _booted = false;      // guard: only one boot path runs loadEvents()
+let _refreshTimer = null; // handle to the auto-refresh interval
+
 
 // ─── Globe init ───────────────────────────────────────────────────────────
 function initMap() {
@@ -26,8 +29,12 @@ function initMap() {
     zoom: 1.6,
     minZoom: 1,
     maxZoom: 14,
+    projection: 'globe',   // MapLibre v4+ constructor param (primary method)
     attributionControl: false,
   });
+
+  // Expose globally for debugging
+  window._twMap = map;
 
   // Surface map errors immediately
   map.on('error', (e) => {
@@ -36,6 +43,7 @@ function initMap() {
 
   return map;
 }
+
 
 // ─── Data loading ─────────────────────────────────────────────────────────
 async function loadEvents(filters = {}) {
@@ -65,6 +73,25 @@ async function loadEvents(filters = {}) {
 
 // ─── Map event binding ────────────────────────────────────────────────────
 function bindMapEvents() {
+  // Click on a cluster → zoom in to expand
+  map.on('click', 'events-clusters', async (e) => {
+    const features = map.queryRenderedFeatures(e.point, { layers: ['events-clusters'] });
+    if (!features.length) return;
+    const clusterId = features[0].properties.cluster_id;
+    try {
+      // MapLibre v4: getClusterExpansionZoom returns a Promise (callback API removed)
+      const zoom = await map.getSource('events-source').getClusterExpansionZoom(clusterId);
+      map.easeTo({ center: features[0].geometry.coordinates, zoom });
+    } catch (err) {
+      console.warn('[TerraWatch] cluster expand error:', err);
+    }
+  });
+
+
+  // Cluster hover cursor
+  map.on('mouseenter', 'events-clusters', () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', 'events-clusters', () => { map.getCanvas().style.cursor = ''; });
+
   // Click on event marker
   map.on('click', 'events-circle', e => {
     const feature = e.features?.[0];
@@ -94,7 +121,7 @@ function bindMapEvents() {
 
   // Click on blank globe → clear selection
   map.on('click', e => {
-    const features = map.queryRenderedFeatures(e.point, { layers: ['events-circle'] });
+    const features = map.queryRenderedFeatures(e.point, { layers: ['events-circle', 'events-clusters'] });
     if (!features.length) {
       closeEventCard();
       clearEventPath(map);
@@ -103,6 +130,7 @@ function bindMapEvents() {
     }
   });
 }
+
 
 // ─── Category filter (sidebar → map) ─────────────────────────────────────
 function handleFilter(visibleCategories) {
@@ -165,13 +193,28 @@ window.showToast = function showToast(msg, type = 'info') {
   setTimeout(() => toast.remove(), 4000);
 };
 
-// ─── Auto-refresh every 15 min ────────────────────────────────────────────
+// ─── Auto-refresh every 15 min — pauses when tab is hidden ───────────────
 function startAutoRefresh() {
-  setInterval(() => {
+  // Clear any existing timer first (safe to call multiple times)
+  if (_refreshTimer) clearInterval(_refreshTimer);
+
+  _refreshTimer = setInterval(() => {
+    // Skip fetch if tab is hidden — saves API calls and battery
+    if (document.visibilityState === 'hidden') return;
     loadEvents();
     showToast('Events refreshed', 'info');
   }, 15 * 60 * 1000);
 }
+
+// Resume/pause auto-refresh with tab visibility
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && _booted) {
+    // Tab became visible — reload immediately then restart timer
+    loadEvents();
+    startAutoRefresh();
+  }
+});
+
 
 // ─── Loading overlay ──────────────────────────────────────────────────────
 function hideLoading() {
@@ -196,9 +239,9 @@ async function bootstrap() {
 
   // Timeout fallback — if style.load never fires (e.g. no WebGL / tile blocked)
   // still show the UI and load event list data.
-  let styleLoaded = false;
   const loadingTimeout = setTimeout(async () => {
-    if (!styleLoaded) {
+    if (!_booted) {
+      _booted = true;
       console.warn('[TerraWatch] style.load timed out — skipping globe render, showing UI.');
       await loadEvents();
       startAutoRefresh();
@@ -206,24 +249,36 @@ async function bootstrap() {
     }
   }, 10000);
 
+
   // Wait for map style + set globe projection/atmosphere together
   map.once('style.load', async () => {
-    styleLoaded = true;
+    if (_booted) return; // timeout already fired — skip
+    _booted = true;
     clearTimeout(loadingTimeout);
 
-    // Globe projection (MapLibre 3.x) — set AFTER style loads to avoid double-fire
-    try { map.setProjection({ name: 'globe' }); } catch (_) {}
 
-    // Space atmosphere
+    // Globe projection is already set via `projection: 'globe'` in the Map constructor.
+    // MapLibre v5 does not need setProjection() called post-load.
+    // (calling it after style.load triggers a full style rebuild and can cause flicker)
+    console.log('[TerraWatch] Projection from constructor:', map.getProjection?.()?.name ?? 'unavailable');
+
+
+    // Space atmosphere (MapLibre v5: setSky replaces setFog)
     try {
-      map.setFog({
-        color: '#060612',
-        'high-color': '#030310',
-        'horizon-blend': 0.015,
-        'space-color': '#000008',
-        'star-intensity': 0.85,
+      map.setSky({
+        'sky-color': '#000008',
+        'sky-horizon-blend': 0.015,
+        'horizon-color': '#060612',
+        'horizon-fog-blend': 0.4,
+        'fog-color': '#030310',
+        'fog-ground-blend': 0.9,
+        'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 6, 0],
       });
-    } catch (_) {}
+    } catch (e) {
+      console.warn('[TerraWatch] setSky failed:', e.message);
+    }
+
+
 
     await loadEvents();
     startAutoRefresh();

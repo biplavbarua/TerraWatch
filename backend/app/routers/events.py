@@ -27,7 +27,7 @@ async def list_events(
     category: Optional[str] = Query(None),
     status: str = Query("open", pattern="^(open|closed|all)$"),
     limit: int = Query(500, le=2000),
-    days: Optional[int] = Query(None),
+    days: Optional[int] = Query(None, ge=1, le=3650),
     min_mag: Optional[float] = Query(None),
 ):
     where = []
@@ -39,7 +39,9 @@ async def list_events(
     if category:
         where.append(f"e.category = ${i}"); args.append(category); i += 1
     if days:
-        where.append(f"g.recorded_at > NOW() - INTERVAL '{days} days'")
+        # Cast to int is safe (validated by Query ge/le), but we still
+        # parameterise the interval to avoid any f-string injection.
+        where.append(f"g.recorded_at > NOW() - (${i} * INTERVAL '1 day')"); args.append(days); i += 1
     if min_mag is not None:
         where.append(f"g.magnitude_value >= ${i}"); args.append(min_mag); i += 1
 
@@ -75,7 +77,7 @@ async def events_geojson(
     category: Optional[str] = Query(None),
     status: str = Query("open", pattern="^(open|closed|all)$"),
     limit: int = Query(1000, le=5000),
-    days: Optional[int] = Query(None),
+    days: Optional[int] = Query(None, ge=1, le=3650),
 ):
     """GeoJSON FeatureCollection — direct source for MapLibre."""
     where = []
@@ -87,7 +89,7 @@ async def events_geojson(
     if category:
         where.append(f"e.category = ${i}"); args.append(category); i += 1
     if days:
-        where.append(f"g.recorded_at > NOW() - INTERVAL '{days} days'")
+        where.append(f"g.recorded_at > NOW() - (${i} * INTERVAL '1 day')"); args.append(days); i += 1
 
     where_sql = ("WHERE " + " AND ".join(where)) if where else ""
     args.append(limit)
@@ -138,7 +140,14 @@ async def events_geojson(
 
 @router.get("/events/{eonet_id}")
 async def get_event(eonet_id: str):
-    row = await db.fetch_one("SELECT * FROM events WHERE eonet_id = $1", eonet_id)
+    row = await db.fetch_one(
+        """
+        SELECT eonet_id, title, category, status, source_url,
+               recorded_at, closed_at
+        FROM events WHERE eonet_id = $1
+        """,
+        eonet_id,
+    )
     if not row:
         raise HTTPException(status_code=404, detail="Event not found")
     return dict(row)
@@ -189,14 +198,16 @@ async def get_event_path(eonet_id: str):
 
 @router.get("/stats")
 async def get_stats(status: str = Query("open", pattern="^(open|closed|all)$")):
-    where = "" if status == "all" else f"WHERE status = '{status}'"
-    rows = await db.fetch_all(
-        f"""
-        SELECT category, COUNT(*) AS count
-        FROM events {where}
-        GROUP BY category ORDER BY count DESC
-        """
-    )
+    """Event counts grouped by category. Parameterised to prevent injection."""
+    if status == "all":
+        rows = await db.fetch_all(
+            "SELECT category, COUNT(*) AS count FROM events GROUP BY category ORDER BY count DESC"
+        )
+    else:
+        rows = await db.fetch_all(
+            "SELECT category, COUNT(*) AS count FROM events WHERE status = $1 GROUP BY category ORDER BY count DESC",
+            status,
+        )
     total = sum(r["count"] for r in rows)
     return {
         "total": total,

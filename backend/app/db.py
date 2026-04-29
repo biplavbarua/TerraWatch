@@ -19,6 +19,11 @@ _pool: Optional[asyncpg.Pool] = None
 
 
 def _ssl_context() -> ssl.SSLContext:
+    # Supabase's session pooler (port 5432) uses a self-signed certificate that
+    # doesn't match the hostname. CERT_NONE is intentional here — the connection
+    # is still encrypted (TLS handshake succeeds); we're just not verifying the
+    # server certificate chain. Use the transaction pooler (port 6543) + sslmode=require
+    # if you want full certificate verification in future.
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE

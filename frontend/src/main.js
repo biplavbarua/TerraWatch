@@ -257,10 +257,8 @@ async function bootstrap() {
     clearTimeout(loadingTimeout);
 
 
-    // Globe projection is already set via `projection: 'globe'` in the Map constructor.
-    // MapLibre v5 does not need setProjection() called post-load.
-    // (calling it after style.load triggers a full style rebuild and can cause flicker)
-    console.log('[TerraWatch] Projection from constructor:', map.getProjection?.()?.name ?? 'unavailable');
+    // Globe projection is set via `projection: 'globe'` in the Map constructor.
+    // MapLibre v5 applies it before style.load fires — no post-load call needed.
 
 
     // Space atmosphere (MapLibre v5: setSky replaces setFog)

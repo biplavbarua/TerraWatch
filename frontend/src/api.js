@@ -21,9 +21,10 @@ export async function fetchEvents({ category, status = 'open', limit = 500, days
 }
 
 /** Fetch events as a GeoJSON FeatureCollection — direct MapLibre source. */
-export async function fetchGeoJSON({ category, status = 'open', limit = 1000 } = {}) {
+export async function fetchGeoJSON({ category, status = 'open', limit = 1000, days } = {}) {
   const p = new URLSearchParams({ status, limit });
   if (category) p.set('category', category);
+  if (days)     p.set('days', days);
   return _json(`${BASE}/events/geojson?${p}`);
 }
 

@@ -10,6 +10,16 @@
   <link href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" rel="stylesheet" />
   <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
 
+  <!--
+    API endpoint configuration.
+    In production this is overridden by the deployment environment.
+    For local development it falls back to http://localhost:8000/api (see api.js).
+    DEPLOY: Replace the URL below with your Railway backend URL before deploying.
+  -->
+  <script>
+    window.__TERRAWATCH_API__ = 'https://terrawatch-api.up.railway.app/api';
+  </script>
+
 
   <!-- App styles -->
   <link rel="stylesheet" href="src/styles/main.css" />

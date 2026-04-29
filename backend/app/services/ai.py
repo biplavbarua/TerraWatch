@@ -1,7 +1,7 @@
 """
 OpenRouter-powered Q&A engine with function calling against the PostGIS DB.
 
-Uses OpenRouter's OpenAI-compatible API with google/gemini-2.0-flash-001.
+Uses OpenRouter's OpenAI-compatible API with google/gemini-2.5-flash.
 The model decides which tool(s) to call; we execute the SQL and return
 the result back to the model for narration.
 """
@@ -20,10 +20,10 @@ logger = logging.getLogger(__name__)
 # ─── OpenRouter client ─────────────────────────────────────────────────────
 _client = AsyncOpenAI(
     base_url="https://openrouter.ai/api/v1",
-    api_key=settings.GEMINI_API_KEY,
+    api_key=settings.OPENROUTER_API_KEY,
 )
 
-_MODEL = "google/gemini-2.0-flash-001"
+_MODEL = "google/gemini-2.5-flash"
 
 _SYSTEM_PROMPT = """
 You are TerraWatch AI — an intelligent assistant with real-time access to

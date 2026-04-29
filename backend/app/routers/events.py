@@ -12,10 +12,11 @@ import json
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Query, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from app import db
+from app.config import settings
 from app.services import ingestion
 
 router = APIRouter(prefix="/api")
@@ -215,8 +216,11 @@ async def get_stats(status: str = Query("open", pattern="^(open|closed|all)$")):
     }
 
 
-@router.post("/ingest/trigger")
-async def trigger_ingest():
-    """Manually trigger an open-events ingestion (dev/admin use)."""
+@router.post("/ingest/trigger", include_in_schema=False)
+async def trigger_ingest(request: Request):
+    """Manually trigger an open-events ingestion. Admin-only — requires X-Admin-Token header."""
+    token = request.headers.get("X-Admin-Token", "")
+    if not token or token != settings.ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Forbidden: valid X-Admin-Token required")
     count = await ingestion.ingest_open_events()
     return {"ingested": count}

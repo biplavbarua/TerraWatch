@@ -23,7 +23,12 @@ _client = AsyncOpenAI(
     api_key=settings.OPENROUTER_API_KEY,
 )
 
-_MODEL = "google/gemini-2.5-flash"
+_MODELS = [
+    "nvidia/llama-3.1-nemotron-70b-instruct",  # Primary: highly capable, excellent reasoning
+    "google/gemini-2.5-flash",                 # Fallback 1: fast, native tool support
+    "meta-llama/llama-3.3-70b-instruct",       # Fallback 2: solid open model
+    "google/gemini-2.0-flash-001"              # Fallback 3: highly reliable, cheap
+]
 
 _SYSTEM_PROMPT = """
 You are TerraWatch AI — an intelligent assistant with real-time access to
@@ -260,13 +265,29 @@ async def ask(question: str) -> str:
 
     # Agentic loop — keep calling tools until model produces text
     for _ in range(5):  # max 5 tool rounds
-        response = await _client.chat.completions.create(
-            model=_MODEL,
-            messages=messages,
-            tools=_TOOLS,
-            tool_choice="auto",
-            max_tokens=4096,   # cap to avoid OpenRouter credit exhaustion (gemini-2.5 defaults to 64K)
-        )
+        response = None
+        last_error = None
+        
+        # Try models in sequence until one succeeds
+        for model in _MODELS:
+            try:
+                response = await _client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    tools=_TOOLS,
+                    tool_choice="auto",
+                    max_tokens=4096,   # cap to avoid OpenRouter credit exhaustion
+                )
+                break  # Success!
+            except Exception as e:
+                logger.warning(f"Model {model} failed: {e}")
+                last_error = e
+                # Fallback to the next model for any API/credit error
+                continue
+                
+        if not response:
+            logger.error(f"All AI models failed. Last error: {last_error}")
+            return "I'm currently experiencing high demand and cannot connect to the AI service. Please try again later."
 
         choice = response.choices[0]
         msg = choice.message

@@ -30,6 +30,15 @@ export function showEventCard(map, feature, { onShowPath } = {}) {
   const lon = coords[0]?.toFixed(4);
   const bgColor = hexToRgba(meta.color, 0.15);
 
+  const severityLevels = {
+    1: { label: 'Low', color: '#3b82f6' },
+    2: { label: 'Minor', color: '#10b981' },
+    3: { label: 'Moderate', color: '#f59e0b' },
+    4: { label: 'Severe', color: '#ef4444' },
+    5: { label: 'Extreme', color: '#b91c1c' }
+  };
+  const sev = severityLevels[p.severity_score] ?? severityLevels[2];
+
   const html = `
     <div class="event-popup">
       <div class="popup-header">
@@ -42,9 +51,14 @@ export function showEventCard(map, feature, { onShowPath } = {}) {
         </div>
       </div>
 
-      <div class="popup-badge ${isOpen ? 'open' : 'closed'}">
-        <span class="dot"></span>
-        ${isOpen ? 'Active' : 'Closed'}
+      <div class="popup-badges" style="display:flex; gap:8px; align-items:center; margin-bottom:16px;">
+        <div class="popup-badge ${isOpen ? 'open' : 'closed'}" style="margin-bottom:0;">
+          <span class="dot"></span>
+          ${isOpen ? 'Active' : 'Closed'}
+        </div>
+        <div class="popup-badge" style="margin-bottom:0; background:${hexToRgba(sev.color, 0.15)}; color:${sev.color}; border:1px solid ${hexToRgba(sev.color, 0.3)};">
+          Severity: ${p.severity_score} - ${sev.label}
+        </div>
       </div>
 
       <div class="popup-stat">

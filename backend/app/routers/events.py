@@ -25,6 +25,40 @@ logger = logging.getLogger(__name__)
 
 _geojson_cache = {}
 
+def calculate_severity(category: str, mag_value: Optional[float], mag_unit: Optional[str]) -> int:
+    """Normalize disjointed EONET metrics into a standard 1-5 scale."""
+    if mag_value is None:
+        if category == "volcanoes": return 4
+        if category == "floods": return 3
+        return 2
+
+    # Normalize unit
+    unit = str(mag_unit).lower().strip()
+    val = float(mag_value)
+
+    if category == "severeStorms":
+        if "kts" in unit or "knots" in unit:
+            if val >= 137: return 5  # Cat 5
+            if val >= 113: return 5  # Cat 4
+            if val >= 96: return 4   # Cat 3
+            if val >= 64: return 3   # Cat 1-2
+            return 2                 # Tropical storm/depression
+        
+    if category == "wildfires":
+        # normalize to acres
+        acres = val * 2.47105 if "hectare" in unit else val
+        if acres > 100000: return 5
+        if acres > 10000: return 4
+        if acres > 1000: return 3
+        return 2
+
+    if category == "seaLakeIce":
+        if "nm^2" in unit and val > 1000: return 3
+        return 2
+
+    # Default fallback
+    return 2
+
 
 @router.get("/events")
 async def list_events(
@@ -73,7 +107,14 @@ async def list_events(
         """,
         *args,
     )
-    return [dict(r) for r in rows]
+    
+    results = []
+    for r in rows:
+        d = dict(r)
+        d["severity_score"] = calculate_severity(d["category"], d["magnitude_value"], d["magnitude_unit"])
+        results.append(d)
+        
+    return results
 
 
 @router.get("/events/geojson")
@@ -141,6 +182,7 @@ async def events_geojson(
                 "magnitude_value": r["magnitude_value"],
                 "magnitude_unit": r["magnitude_unit"],
                 "path_points": int(r["path_points"] or 0),
+                "severity_score": calculate_severity(r["category"], r["magnitude_value"], r["magnitude_unit"]),
             },
         })
 
@@ -167,7 +209,7 @@ async def get_event(eonet_id: str):
 @router.get("/events/{eonet_id}/path")
 async def get_event_path(eonet_id: str):
     """Full trajectory as GeoJSON LineString (or MultiPoint if only 1 point)."""
-    event = await db.fetch_one("SELECT id FROM events WHERE eonet_id = $1", eonet_id)
+    event = await db.fetch_one("SELECT id, category FROM events WHERE eonet_id = $1", eonet_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
 
@@ -201,7 +243,12 @@ async def get_event_path(eonet_id: str):
                 "eonet_id": eonet_id,
                 "timestamps": timestamps,
                 "magnitudes": magnitudes,
-                "magnitude_unit": points[0]["magnitude_unit"],
+                "magnitude_unit": points[0]["magnitude_unit"] if points else None,
+                "severity_score": calculate_severity(
+                    event["category"], 
+                    max(magnitudes) if magnitudes and magnitudes[0] is not None else None, 
+                    points[0]["magnitude_unit"] if points else None
+                )
             },
         }],
     }

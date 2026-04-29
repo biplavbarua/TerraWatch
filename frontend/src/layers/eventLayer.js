@@ -45,25 +45,32 @@ function buildEmojiExpression() {
   return expr;
 }
 
-/** Radius scaling based on magnitude (normalized, 5–28 px). */
+/** Radius scaling based on severity (1-5). */
 const RADIUS_EXPR = [
-  'case',
-  ['!=', ['get', 'magnitude_value'], null],
-  ['interpolate', ['linear'], ['get', 'magnitude_value'], 0, 5, 200, 22],
-  8, // default
+  'match', ['coalesce', ['get', 'severity_score'], 2],
+  1, 5,
+  2, 7,
+  3, 10,
+  4, 14,
+  5, 20,
+  7 // default
 ];
 
 let _pulseTimer = null;
-let _pulseRadius = 14;
+let _pulseOffset = 0;
 let _pulseDir = 1;
 
 function startPulseAnimation(map) {
   stopPulse(); // clear any existing timer before starting a new one
   _pulseTimer = setInterval(() => {
-    _pulseRadius += _pulseDir * 0.6;
-    if (_pulseRadius > 22 || _pulseRadius < 12) _pulseDir *= -1;
+    _pulseOffset += _pulseDir * 0.3;
+    if (_pulseOffset > 6 || _pulseOffset < 0) _pulseDir *= -1;
     if (map.getLayer('events-halo')) {
-      map.setPaintProperty('events-halo', 'circle-radius', _pulseRadius);
+      map.setPaintProperty('events-halo', 'circle-radius', [
+        '+',
+        RADIUS_EXPR,
+        ['+', 3, _pulseOffset]
+      ]);
     }
   }, 60);
 }
@@ -133,9 +140,14 @@ export function initEventLayer(map, geojson) {
     source: 'events-source',
     filter: ['all', ['!', ['has', 'point_count']], ['==', ['get', 'status'], 'open']],
     paint: {
-      'circle-radius': 14,
+      'circle-radius': ['+', RADIUS_EXPR, 3],
       'circle-color': buildColorExpression(),
-      'circle-opacity': 0.18,
+      'circle-opacity': [
+        'interpolate', ['linear'], ['coalesce', ['get', 'severity_score'], 2],
+        1, 0.15,
+        3, 0.2,
+        5, 0.35
+      ],
       'circle-stroke-width': 0,
     },
   });

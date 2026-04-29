@@ -265,6 +265,7 @@ async def ask(question: str) -> str:
             messages=messages,
             tools=_TOOLS,
             tool_choice="auto",
+            max_tokens=4096,   # cap to avoid OpenRouter credit exhaustion (gemini-2.5 defaults to 64K)
         )
 
         choice = response.choices[0]
